@@ -5,11 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"reflect"
+	"slices"
+	"strings"
 )
 
-//const ChunkSize = 4 * 1024
-const ChunkSize = 100
+type AppSettings struct {
+    WithHeader bool
+    rowsHandled int
+    headerRow []string
+}
+
+var appSettings *AppSettings
+
+const ChunkSize = 4 * 1024
+// const ChunkSize = 100
 
 const (
     StateStart = iota
@@ -81,15 +93,53 @@ func (p *CSVParser) ProcessRemaining(emitRow func([]string)) {
     }
 }
 
-var rowsHandled int
-
 func handleRow(row []string) {
-    rowsHandled++
-    // fmt.Printf("Row: %v\n", row)
+    appSettings.rowsHandled++
+    if appSettings.WithHeader && appSettings.rowsHandled == 1 {
+        headerRow := make([]string, len(row))
+        headerLen := copy(headerRow, row)
+        if headerLen != len(row) {
+            log.Fatalln("Header row not correctly created!")
+        }
+
+        fmt.Printf("Header row: %v\n", headerRow)
+    }
 }
 
-func readFile(filePath string) error {
-    rowsHandled = 0
+func concuctStruct[T any](s T, filePath string) (T, error) {
+    structType := reflect.TypeOf(s)
+
+    appSettings := AppSettings { WithHeader: true }
+    appSettings.headerRow = []string{"test", "id", "id2", "something else"}
+
+    // csvTags := make([]string, 0)
+    for i := 0; i < structType.NumField(); i++ {
+        field := structType.Field(i)
+        fieldTag := string(field.Tag)
+        if fieldTag == "" || !strings.HasPrefix(fieldTag, "csv:") {
+            continue
+        }
+
+        if field.Type.Kind() != reflect.Slice {
+            log.Fatalf("Only slice types allowed! Current type of column %v is: %v", field.Name, field.Type)
+        }
+
+        columnName := strings.Split(fieldTag, ":")[1]
+        columnName = strings.Trim(columnName, "\"")
+        fmt.Printf("Field: %v\n", columnName)
+        fmt.Printf("Field type: %v\n", field.Type)
+
+        // get corresponding header row position
+        position := slices.Index(appSettings.headerRow, columnName)
+        fmt.Printf("Field position in header row: %v\n", position)
+    }
+
+    return *new(T), nil
+} 
+
+func readFile(filePath string, settings *AppSettings) error {
+    appSettings = settings
+
     file, err := os.Open(filePath)
     if err != nil {
         return errors.New(fmt.Sprintf("Failed to open file: %v", err))
@@ -124,7 +174,7 @@ func readFile(filePath string) error {
 
     parser.ProcessRemaining(handleRow)
     
-    fmt.Printf("Rows handled: %v", rowsHandled)
+    // fmt.Printf("Rows handled: %v", rowsHandled)
 
     return nil
 }
