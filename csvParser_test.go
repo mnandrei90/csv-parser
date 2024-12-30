@@ -1,45 +1,61 @@
 package csvparser
 
 import (
+	"fmt"
 	"log"
 	"testing"
 )
 
-func TestSmall(t *testing.T) {
-    settings := AppSettings { WithHeader: false }
-    err := readFile("test_data/test.csv", &settings)
-    if err != nil {
-        log.Fatalln(err)
-    }
-}
-
-func TestLarge(t *testing.T) {
-    settings := AppSettings { WithHeader: false }
-    err := readFile("test_data/test_large.csv", &settings)
-    if err != nil {
-        log.Fatalln(err)
-    }
-}
-
-func TestExtraLarge(t *testing.T) {
-    settings := AppSettings { WithHeader: true }
-    err := readFile("test_data/test_xl.csv", &settings)
-    if err != nil {
-        log.Fatalln(err)
-    }
-}
-
 type MyStruct struct {
     Id []int `csv:"id"`
-    Name []string `csv:"first name"`
+    Name []string `csv:"firstname"`
+    LastName []string `csv:"lastname"`
+    Email []string `csv:"email"`
+    SecondaryEmail []string `csv:"email2"`
+    Profession []string `csv:"profession"`
 }
 
 type MyStruct2 struct {
-    Id int `csv:"id2"`
-    Name string `csv:"first name2"`
+    Id []int
+    Name []string
+    LastName []string
+    Email []string
+    SecondaryEmail []string
+    Profession []string
 }
 
 func TestConcuct(t *testing.T) {
-    concuctStruct(MyStruct{}, "")
-    concuctStruct(MyStruct2{}, "")
+    testStruct := MyStruct{}
+    // testStruct := MyStruct2{}
+    err := concuctStruct(&testStruct, "test_data/test_w_header.csv", &AppSettings{WithHeader: true})
+    if err != nil {
+        log.Fatalln(err)
+    }
+    
+    fmt.Println(testStruct)
+    // concuctStruct(MyStruct2{}, "")
+}
+
+func TestConcuct2(t *testing.T) {
+    // testStruct := MyStruct{}
+    testStruct := MyStruct2{}
+    err := concuctStruct(&testStruct, "test_data/test_wo_header.csv", &AppSettings{WithHeader: false})
+    if err != nil {
+        log.Fatalln(err)
+    }
+    
+    fmt.Println(testStruct)
+    // concuctStruct(MyStruct2{}, "")
+}
+
+func TestConcuct3(t *testing.T) {
+    // testStruct := MyStruct{}
+    testStruct := MyStruct{}
+    err := concuctStruct(&testStruct, "test_data/test_xl.csv", &AppSettings{WithHeader: true})
+    if err != nil {
+        log.Fatalln(err)
+    }
+    
+    fmt.Println(testStruct.Name[99999])
+    // concuctStruct(MyStruct2{}, "")
 }
