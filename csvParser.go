@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const ChunkSize = 4 * 1024
+const chunkSize = 4 * 1024
 
 type AppSettings struct {
     WithHeader bool
@@ -21,46 +21,47 @@ type AppSettings struct {
 var appSettings *AppSettings
 
 const (
-    StateStart = iota
-    StateInField
-    StateInQuotedField
+    stateStart = iota
+    stateInField
+    stateInQuotedField
 )
 
-type CSVParser struct {
+type csvParser struct {
     state int
     currentField []byte
     currentRow []string
     inQuotes bool
 }
 
-func NewCSVParser() *CSVParser {
-    return &CSVParser {
-        state: StateStart,
+func newCSVParser() *csvParser {
+    return &csvParser {
+        state: stateStart,
     }
 }
 
-func (p *CSVParser) ProcessByte(b byte, emitRow func([]string) error) error {
+func (p *csvParser) processByte(b byte, emitRow func([]string) error) error {
     switch p.state {
-        case StateStart:
+        case stateStart:
             if b == ',' {
                 p.currentRow = append(p.currentRow, "")
             } else if b == '"' {
-                p.state = StateInQuotedField
+                p.state = stateInQuotedField
+                p.currentField = append(p.currentField, b)
             } else if b == '\n' {
                 if err := emitRow(p.currentRow); err != nil {
                     return err
                 }
                 p.currentRow = nil
             } else {
-                p.state = StateInField
+                p.state = stateInField
                 p.currentField = append(p.currentField, b)
             }
 
-        case StateInField:
+        case stateInField:
             if b == ',' {
                 p.currentRow = append(p.currentRow, string(p.currentField))
                 p.currentField = nil
-                p.state = StateStart
+                p.state = stateStart
             } else if b == '\n' {
                 p.currentRow = append(p.currentRow, string(p.currentField))
                 p.currentField = nil
@@ -70,16 +71,16 @@ func (p *CSVParser) ProcessByte(b byte, emitRow func([]string) error) error {
                 }
 
                 p.currentRow = nil
-                p.state = StateStart
+                p.state = stateStart
             } else {
                 p.currentField = append(p.currentField, b)
             }
 
-        case StateInQuotedField:
+        case stateInQuotedField:
             if b == '"' {
                 p.inQuotes = !p.inQuotes
                 if !p.inQuotes {
-                    p.state = StateInField
+                    p.state = stateInField
                 } else {
                     p.currentField = append(p.currentField, b)
                 }
@@ -91,7 +92,7 @@ func (p *CSVParser) ProcessByte(b byte, emitRow func([]string) error) error {
     return nil
 }
 
-func (p *CSVParser) ProcessRemaining(emitRow func([]string) error) error {
+func (p *csvParser) processRemaining(emitRow func([]string) error) error {
     if len(p.currentField) > 0 || len(p.currentRow) > 0 {
         p.currentRow = append(p.currentRow, string(p.currentField))
         if err := emitRow(p.currentRow); err != nil {
@@ -159,15 +160,15 @@ func populateStructField(structValue *reflect.Value, row []string, pos int) erro
 
     field := structValue.Elem().FieldByIndex([]int{pos})
     if !field.IsValid() {
-        return errors.New(fmt.Sprintf("field at position [%v] not valid\n", pos))
+        return errors.New(fmt.Sprintf("Field at position [%v] not valid\n", pos))
     }
 
     if field.Kind() != reflect.Slice {
-        return errors.New(fmt.Sprintf("field at position [%v] not a slice\n", pos))
+        return errors.New(fmt.Sprintf("Field at position [%v] not a slice\n", pos))
     }
 
     if !field.CanSet() {
-        return errors.New(fmt.Sprintf("field at position [%v] can't be set\n", pos))
+        return errors.New(fmt.Sprintf("Field at position [%v] can't be set\n", pos))
     }
 
     valueToAppend := reflect.ValueOf(row[pos])
@@ -192,7 +193,7 @@ func populateStructField(structValue *reflect.Value, row []string, pos int) erro
             return errors.New(fmt.Sprintf("Failed to convert value to float: %v\n", err))
         }
 
-        valueToAppend = reflect.ValueOf(valueAsFloat)
+        valueToAppend = reflect.ValueOf(float32(valueAsFloat))
         newSlice := reflect.Append(field, valueToAppend)
         field.Set(newSlice)
     case reflect.Float64:
@@ -211,7 +212,53 @@ func populateStructField(structValue *reflect.Value, row []string, pos int) erro
     return nil
 }
 
-func concuctStruct[T any](structPtr *T, filePath string, settings *AppSettings) error {
+func readFile(filePath string, settings *AppSettings, emitRow func([]string) error) error {
+    appSettings = settings
+
+    file, err := os.Open(filePath)
+    if err != nil {
+        return errors.New(fmt.Sprintf("Failed to open file: %v", err))
+    }
+    defer file.Close()
+
+    // Create a buffered reader
+    reader := bufio.NewReader(file)
+
+    // Allocate buffer for chunks
+    buffer := make([]byte, chunkSize)
+
+    parser := newCSVParser()
+
+    for {
+        n, err := reader.Read(buffer)
+        if n > 0 {
+            // Read was successful, do something
+            for i := 0; i < n; i++ {
+                err := parser.processByte(buffer[i], emitRow)
+                if err != nil {
+                    return err
+                }
+            }
+        }
+
+        if err != nil {
+            if err == io.EOF {
+                break
+            }
+
+            return errors.New(fmt.Sprintf("Failed to open file: %v", err))
+        }
+    }
+
+    err = parser.processRemaining(emitRow)
+    if err != nil {
+        return err
+    }
+    
+    return nil
+}
+
+func ConcuctStruct[T any](structPtr *T, filePath string, settings *AppSettings) error {
     if settings == nil {
         return errors.New("AppSettings not set!")
     }
@@ -246,48 +293,3 @@ func concuctStruct[T any](structPtr *T, filePath string, settings *AppSettings) 
     return nil
 } 
 
-func readFile(filePath string, settings *AppSettings, emitRow func([]string) error) error {
-    appSettings = settings
-
-    file, err := os.Open(filePath)
-    if err != nil {
-        return errors.New(fmt.Sprintf("Failed to open file: %v", err))
-    }
-    defer file.Close()
-
-    // Create a buffered reader
-    reader := bufio.NewReader(file)
-
-    // Allocate buffer for chunks
-    buffer := make([]byte, ChunkSize)
-
-    parser := NewCSVParser()
-
-    for {
-        n, err := reader.Read(buffer)
-        if n > 0 {
-            // Read was successful, do something
-            for i := 0; i < n; i++ {
-                err := parser.ProcessByte(buffer[i], emitRow)
-                if err != nil {
-                    return err
-                }
-            }
-        }
-
-        if err != nil {
-            if err == io.EOF {
-                break
-            }
-
-            return errors.New(fmt.Sprintf("Failed to open file: %v", err))
-        }
-    }
-
-    err = parser.ProcessRemaining(emitRow)
-    if err != nil {
-        return err
-    }
-    
-    return nil
-}

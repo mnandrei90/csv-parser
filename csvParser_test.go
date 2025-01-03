@@ -24,38 +24,49 @@ type MyStruct2 struct {
     Profession []string
 }
 
-func TestConcuct(t *testing.T) {
-    testStruct := MyStruct{}
-    // testStruct := MyStruct2{}
-    err := concuctStruct(&testStruct, "test_data/test_w_header.csv", &AppSettings{WithHeader: true})
+type MyStruct3 struct {
+    First []string
+    Second []int
+    Third []float32
+    Fourth []string
+}
+
+func TestSpecial(t *testing.T) {
+    testStruct := MyStruct3{}
+    err := ConcuctStruct(&testStruct, "test_data/test.csv", &AppSettings{WithHeader: false})
     if err != nil {
         log.Fatalln(err)
     }
     
     fmt.Println(testStruct)
-    // concuctStruct(MyStruct2{}, "")
+}
+
+func TestConcuct(t *testing.T) {
+    testStruct := MyStruct{}
+    err := ConcuctStruct(&testStruct, "test_data/test_w_header.csv", &AppSettings{WithHeader: true})
+    if err != nil {
+        log.Fatalln(err)
+    }
+    
+    fmt.Println(testStruct)
 }
 
 func TestConcuct2(t *testing.T) {
-    // testStruct := MyStruct{}
     testStruct := MyStruct2{}
-    err := concuctStruct(&testStruct, "test_data/test_wo_header.csv", &AppSettings{WithHeader: false})
+    err := ConcuctStruct(&testStruct, "test_data/test_wo_header.csv", &AppSettings{WithHeader: false})
     if err != nil {
         log.Fatalln(err)
     }
     
     fmt.Println(testStruct)
-    // concuctStruct(MyStruct2{}, "")
 }
 
 func TestConcuct3(t *testing.T) {
-    // testStruct := MyStruct{}
     testStruct := MyStruct{}
-    err := concuctStruct(&testStruct, "test_data/test_xl.csv", &AppSettings{WithHeader: true})
+    err := ConcuctStruct(&testStruct, "test_data/test_xl.csv", &AppSettings{WithHeader: true})
     if err != nil {
         log.Fatalln(err)
     }
     
     fmt.Println(testStruct.Name[99999])
-    // concuctStruct(MyStruct2{}, "")
 }
