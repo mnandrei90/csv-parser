@@ -268,8 +268,8 @@ func readFile(filePath string, settings *AppSettings, emitRow func([]string) err
 //
 // Example:
 //     type MyStruct struct {
-//         Id []Int
-//         Name []strings
+//         Id []Int `csv:"id"`
+//         Name []strings `csv:"name"`
 //     }
 //
 //     func main() {
