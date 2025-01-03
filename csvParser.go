@@ -258,6 +258,29 @@ func readFile(filePath string, settings *AppSettings, emitRow func([]string) err
     return nil
 }
 
+// ConcuctStruct reads a CSV file and populates a struct with the data.
+//
+// The struct must be a pointer to a slice of a struct.
+// It must either have fields with the "csv:x" tag set to the column name in the CSV file, or no tags at all.
+// Also its fields must have fields of type slice of string, int, float32 or float64.
+//
+// An AppSettings struct must be provided with the WithHeader field set to true if the CSV file has a header row.
+//
+// Example:
+//     type MyStruct struct {
+//         Id []Int
+//         Name []strings
+//     }
+//
+//     func main() {
+//         myStruct := MyStruct{}
+//         err := ConcuctStruct(&myStruct, "data.csv", &AppSettings{WithHeader: false})
+//         if err != nil {
+//             log.Fatalln(err)
+//         }
+//
+//         fmt.Println(myStruct)
+//     }
 func ConcuctStruct[T any](structPtr *T, filePath string, settings *AppSettings) error {
     if settings == nil {
         return errors.New("AppSettings not set!")
